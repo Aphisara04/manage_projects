@@ -1,0 +1,294 @@
+<?php
+// ตั้งค่าการเชื่อมต่อฐานข้อมูล
+require 'connect.php';
+
+// ดึงรายชื่ออาจารย์ที่ปรึกษา
+$sql_advisors = "SELECT t.teacher_id, u.full_name, t.academic_rank 
+                 FROM teachers t 
+                 JOIN users u ON t.user_id = u.user_id 
+                 ORDER BY u.full_name";
+$result_advisors = $conn->query($sql_advisors);
+
+// เมื่อมีการส่งฟอร์ม
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // รับค่าจากฟอร์ม
+    $project_name = $_POST['project_name'];
+    $description = $_POST['description'];
+    $start_date = $_POST['start_date'];
+    $end_date = $_POST['end_date'];
+    $status = $_POST['status'];
+    $advisor_id = $_POST['advisor_id'];
+    $student_ids = $_POST['student_ids']; // array ของรหัสนักศึกษา
+
+    // เริ่ม transaction
+    $conn->begin_transaction();
+
+    try {
+        // เพิ่มข้อมูลในตาราง projects
+        $sql_project = "INSERT INTO projects (project_name, description, start_date, end_date, status, advisor_id) 
+                       VALUES (?, ?, ?, ?, ?, ?)";
+        $stmt_project = $conn->prepare($sql_project);
+        $stmt_project->bind_param("sssssi", $project_name, $description, $start_date, $end_date, $status, $advisor_id);
+        $stmt_project->execute();
+        
+        // ดึง project_id ที่เพิ่งเพิ่มเข้าไป
+        $project_id = $conn->insert_id;
+
+        // เพิ่มข้อมูลสมาชิกโครงงาน
+        $sql_member = "INSERT INTO project_members (project_id, student_id, role_in_project) VALUES (?, ?, 'member')";
+        $stmt_member = $conn->prepare($sql_member);
+        
+        foreach ($student_ids as $student_id) {
+            $stmt_member->bind_param("ii", $project_id, $student_id);
+            $stmt_member->execute();
+        }
+
+        // ยืนยัน transaction
+        $conn->commit();
+        echo "<div class='alert alert-success'>เพิ่มข้อมูลโครงงานสำเร็จ</div>";
+    } catch (Exception $e) {
+        // ถ้ามีข้อผิดพลาดให้ rollback
+        $conn->rollback();
+        echo "<div class='alert alert-danger'>เกิดข้อผิดพลาด: " . $e->getMessage() . "</div>";
+    }
+}
+
+// ดึงรายชื่อนักศึกษาที่ยังไม่มีโครงงาน
+$sql_students = "SELECT s.student_id, u.full_name, s.student_code 
+                 FROM students s 
+                 JOIN users u ON s.user_id = u.user_id 
+                 LEFT JOIN project_members pm ON s.student_id = pm.student_id 
+                 WHERE pm.member_id IS NULL 
+                 ORDER BY u.full_name";
+$result_students = $conn->query($sql_students);
+?>
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เพิ่มข้อมูลโครงงาน</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+</head>
+<body>
+    <div class="container mt-5">
+        <h2 class="mb-4">เพิ่มข้อมูลโครงงาน</h2>
+        <form method="POST" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" class="needs-validation" novalidate>
+            <div class="row">
+                <div class="col-md-12 mb-3">
+                    <label for="project_name" class="form-label">ชื่อโครงงาน:</label>
+                    <input type="text" class="form-control" id="project_name" name="project_name" required>
+                </div>
+
+                <div class="col-md-12 mb-3">
+                    <label for="description" class="form-label">รายละเอียดโครงงาน:</label>
+                    <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label for="start_date" class="form-label">วันที่เริ่มต้น:</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" required>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label for="end_date" class="form-label">วันที่สิ้นสุด:</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" required>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label for="status" class="form-label">สถานะ:</label>
+                    <select class="form-select" id="status" name="status" required>
+                        <option value="planning">วางแผน</option>
+                        <option value="in_progress">กำลังดำเนินการ</option>
+                        <option value="completed">เสร็จสิ้น</option>
+                        <option value="suspended">ระงับ</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label for="advisor_id" class="form-label">อาจารย์ที่ปรึกษา:</label>
+                    <select class="form-select" id="advisor_id" name="advisor_id" required>
+                        <option value="">เลือกอาจารย์ที่ปรึกษา</option>
+                        <?php 
+                        if ($result_advisors->num_rows > 0) {
+                            while($row = $result_advisors->fetch_assoc()) {
+                                echo "<option value='" . $row["teacher_id"] . "'>" . 
+                                     $row["academic_rank"] . " " . $row["full_name"] . 
+                                     "</option>";
+                            }
+                        }
+                        ?>
+                    </select>
+                </div>
+
+                <div class="col-md-12 mb-3">
+                    <label for="student_ids" class="form-label">สมาชิกโครงงาน:</label>
+                    <select class="form-select" id="student_ids" name="student_ids[]" multiple required>
+                        <?php 
+                        if ($result_students->num_rows > 0) {
+                            while($row = $result_students->fetch_assoc()) {
+                                echo "<option value='" . $row["student_id"] . "'>" . 
+                                     $row["student_code"] . " - " . $row["full_name"] . 
+                                     "</option>";
+                            }
+                        }
+                        ?>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">บันทึกข้อมูล</button>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        // Initialize Select2
+        $(document).ready(function() {
+            $('#student_ids').select2({
+                placeholder: 'เลือกสมาชิกโครงงาน',
+                allowClear: true
+            });
+        });
+
+        // Form validation
+        (function () {
+            'use strict'
+            var forms = document.querySelectorAll('.needs-validation')
+            Array.prototype.slice.call(forms)
+                .forEach(function (form) {
+                    form.addEventListener('submit', function (event) {
+                        if (!form.checkValidity()) {
+                            event.preventDefault()
+                            event.stopPropagation()
+                        }
+                        form.classList.add('was-validated')
+                    }, false)
+                })
+        })()
+    </script>
+</body>
+<?php
+require 'connect.php';
+
+// ลบโครงงาน
+if (isset($_POST['delete_project'])) {
+    $project_id = $_POST['project_id'];
+    $conn->begin_transaction();
+    
+    try {
+        // ลบสมาชิกโครงงาน
+        $stmt = $conn->prepare("DELETE FROM project_members WHERE project_id = ?");
+        $stmt->bind_param("i", $project_id);
+        $stmt->execute();
+        
+        // ลบโครงงาน
+        $stmt = $conn->prepare("DELETE FROM projects WHERE project_id = ?");
+        $stmt->bind_param("i", $project_id);
+        $stmt->execute();
+        
+        $conn->commit();
+        echo "<div class='alert alert-success'>ลบโครงงานสำเร็จ</div>";
+    } catch (Exception $e) {
+        $conn->rollback();
+        echo "<div class='alert alert-danger'>เกิดข้อผิดพลาด: " . $e->getMessage() . "</div>";
+    }
+}
+
+// ดึงข้อมูลโครงงาน
+$sql = "SELECT p.*, u.full_name as advisor_name, t.academic_rank,
+        GROUP_CONCAT(CONCAT(s.student_code, ' - ', us.full_name) SEPARATOR '<br>') as members
+        FROM projects p
+        JOIN teachers t ON p.advisor_id = t.teacher_id
+        JOIN users u ON t.user_id = u.user_id
+        LEFT JOIN project_members pm ON p.project_id = pm.project_id
+        LEFT JOIN students s ON pm.student_id = s.student_id
+        LEFT JOIN users us ON s.user_id = us.user_id
+        GROUP BY p.project_id
+        ORDER BY p.start_date DESC";
+$result = $conn->query($sql);
+?>
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>รายการโครงงาน</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>รายการโครงงาน</h2>
+            <a href="project_add.php" class="btn btn-primary">เพิ่มโครงงาน</a>
+        </div>
+
+        <table id="projectTable" class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ชื่อโครงงาน</th>
+                    <th>อาจารย์ที่ปรึกษา</th>
+                    <th>สมาชิก</th>
+                    <th>วันที่เริ่ม</th>
+                    <th>วันที่สิ้นสุด</th>
+                    <th>สถานะ</th>
+                    <th>จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php while($row = $result->fetch_assoc()): ?>
+                <tr>
+                    <td><?php echo $row['project_name']; ?></td>
+                    <td><?php echo $row['academic_rank'] . ' ' . $row['advisor_name']; ?></td>
+                    <td><?php echo $row['members']; ?></td>
+                    <td><?php echo date('d/m/Y', strtotime($row['start_date'])); ?></td>
+                    <td><?php echo date('d/m/Y', strtotime($row['end_date'])); ?></td>
+                    <td>
+                        <?php
+                        $status_map = [
+                            'planning' => 'วางแผน',
+                            'in_progress' => 'กำลังดำเนินการ',
+                            'completed' => 'เสร็จสิ้น',
+                            'suspended' => 'ระงับ'
+                        ];
+                        echo $status_map[$row['status']] ?? $row['status'];
+                        ?>
+                    </td>
+                    <td>
+                        <a href="project_edit.php?id=<?php echo $row['project_id']; ?>" 
+                           class="btn btn-warning btn-sm">แก้ไข</a>
+                        <form method="POST" style="display: inline;" 
+                              onsubmit="return confirm('ยืนยันการลบโครงงาน?');">
+                            <input type="hidden" name="project_id" value="<?php echo $row['project_id']; ?>">
+                            <button type="submit" name="delete_project" 
+                                    class="btn btn-danger btn-sm">ลบ</button>
+                        </form>
+                    </td>
+                </tr>
+                <?php endwhile; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#projectTable').DataTable({
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/1.11.5/i18n/th.json"
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+</html>

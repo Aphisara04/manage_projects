@@ -88,7 +88,17 @@ while ($row = $result->fetch_assoc()) {
 
     <div class="container mt-4">
         <h2>ติดตามความคืบหน้าโครงงาน</h2>
-        
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="student/manage_documents.php"><i class="fas fa-file-alt"></i> จัดการเอกสาร</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
         <?php if (isset($_SESSION['success'])): ?>
             <div class="alert alert-success">
                 <?php 
@@ -215,4 +225,4 @@ while ($row = $result->fetch_assoc()) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-</html>
+</html

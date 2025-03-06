@@ -56,7 +56,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 <body>
     <div class="container mt-5">
-        <h2 class="mb-4">เพิ่มข้อมูลนักศึกษา</h2>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>เพิ่มข้อมูลนักศึกษา</h2>
+            <a href="index.php" class="btn btn-secondary">กลับไปหน้าหลัก</a>
+        </div>
+        
         <form method="POST" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" class="needs-validation" novalidate>
             <div class="row">
                 <!-- ข้อมูลผู้ใช้ -->
@@ -106,6 +110,62 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </form>
     </div>
 
+    <!-- เพิ่มตารางแสดงข้อมูล -->
+    <div class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3>ข้อมูลนักศึกษาทั้งหมด</h3>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered">
+                <thead>
+                    <tr>
+                        <th>รหัสนักศึกษา</th>
+                        <th>ชื่อ-นามสกุล</th>
+                        <th>อีเมล</th>
+                        <th>ภาควิชา</th>
+                        <th>ชั้นปี</th>
+                        <th>สาขาวิชา</th>
+                        <th>การจัดการ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    // คำสั่ง SQL สำหรับดึงข้อมูล
+                    try {
+                        $sql = "SELECT s.*, u.full_name, u.email, u.department 
+                                FROM students s 
+                                JOIN users u ON s.user_id = u.user_id 
+                                ORDER BY s.student_code";
+                        $result = $conn->query($sql);
+
+                        if ($result && $result->num_rows > 0) {
+                            while($row = $result->fetch_assoc()) {
+                                echo "<tr>";
+                                echo "<td>".$row['student_code']."</td>";
+                                echo "<td>".$row['full_name']."</td>";
+                                echo "<td>".$row['email']."</td>";
+                                echo "<td>".$row['department']."</td>";
+                                echo "<td>".$row['year_of_study']."</td>";
+                                echo "<td>".$row['major']."</td>";
+                                echo "<td>";
+                                echo "<a href='student_edit.php?id=".$row['student_id']."' class='btn btn-warning btn-sm me-2'>แก้ไข</a>";
+                                echo "<button onclick='confirmDelete(".$row['student_id'].")' class='btn btn-danger btn-sm'>ลบ</button>";
+                                echo "</td>";
+                                echo "</tr>";
+                            }
+                        } else {
+                            echo "<tr><td colspan='7' class='text-center'>ไม่พบข้อมูลนักศึกษา</td></tr>";
+                        }
+                    } catch (Exception $e) {
+                        echo "<tr><td colspan='7' class='text-center'>เกิดข้อผิดพลาดในการดึงข้อมูล: " . $e->getMessage() . "</td></tr>";
+                    }
+                    ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // เพิ่ม JavaScript สำหรับการตรวจสอบฟอร์ม
@@ -123,61 +183,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     }, false)
                 })
         })()
-    </script>
-    <script>
-    function confirmDelete(studentId) {
-        if (confirm('คุณต้องการลบข้อมูลนักศึกษานี้ใช่หรือไม่?')) {
-            window.location.href = 'student_delete.php?id=' + studentId;
-        }
-    }
-</script>
-</body>
-<!-- เพิ่มตารางแสดงข้อมูล -->
-<div class="mt-5">
-    <h3>ข้อมูลนักศึกษาทั้งหมด</h3>
-    <div class="table-responsive">
-        <table class="table table-striped table-bordered">
-            <thead>
-                <tr>
-                    <th>รหัสนักศึกษา</th>
-                    <th>ชื่อ-นามสกุล</th>
-                    <th>อีเมล</th>
-                    <th>ภาควิชา</th>
-                    <th>ชั้นปี</th>
-                    <th>สาขาวิชา</th>
-                    <th>การจัดการ</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                // คำสั่ง SQL สำหรับดึงข้อมูล
-                $sql = "SELECT s.*, u.full_name, u.email, u.department 
-                        FROM students s 
-                        JOIN users u ON s.user_id = u.user_id 
-                        ORDER BY s.student_code";
-                $result = $conn->query($sql);
 
-                if ($result->num_rows > 0) {
-                    while($row = $result->fetch_assoc()) {
-                        echo "<tr>";
-                        echo "<td>".$row['student_code']."</td>";
-                        echo "<td>".$row['full_name']."</td>";
-                        echo "<td>".$row['email']."</td>";
-                        echo "<td>".$row['department']."</td>";
-                        echo "<td>".$row['year_of_study']."</td>";
-                        echo "<td>".$row['major']."</td>";
-                        echo "<td>";
-                        echo "<a href='student_edit.php?id=".$row['student_id']."' class='btn btn-warning btn-sm me-2'>แก้ไข</a>";
-                        echo "<button onclick='confirmDelete(".$row['student_id'].")' class='btn btn-danger btn-sm'>ลบ</button>";
-                        echo "</td>";
-                        echo "</tr>";
-                    }
-                } else {
-                    echo "<tr><td colspan='7' class='text-center'>ไม่พบข้อมูลนักศึกษา</td></tr>";
-                }
-                ?>
-            </tbody>
-        </table>
-    </div>
-</div>
+        // ฟังก์ชันยืนยันการลบ
+        function confirmDelete(studentId) {
+            if (confirm('คุณต้องการลบข้อมูลนักศึกษานี้ใช่หรือไม่?')) {
+                window.location.href = 'student_delete.php?id=' + studentId;
+            }
+        }
+    </script>
+</body>
 </html>

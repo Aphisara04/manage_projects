@@ -100,7 +100,7 @@ if (!$result) {
                         <div class="btn-group">
                             <button type="button" class="btn btn-primary btn-sm" 
                                     onclick="editProject(<?php echo $project['project_id']; ?>)">
-                                <i class="fas fa-edit"></i> แก้ไข
+                                <i class="fas fa-edit"></i> แก้ไข 
                             </button>
                             <button type="button" class="btn btn-info btn-sm" 
                                     onclick="uploadDocument(<?php echo $project['project_id']; ?>)">
@@ -128,7 +128,7 @@ if (!$result) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     function editProject(projectId) {
-        window.location.href = `edit_project.php?id=${projectId}`;
+        window.location.href = `project_edit.php?id=${projectId}`;
     }
 
     function uploadDocument(projectId) {
@@ -141,7 +141,7 @@ if (!$result) {
 
     function deleteProject(projectId) {
         if (confirm('คุณแน่ใจหรือไม่ที่จะลบโครงงานนี้?')) {
-            window.location.href = `delete_project.php?id=${projectId}`;
+            window.location.href = `project_delete.php?id=${projectId}`;
         }
     }
     </script>
